@@ -221,7 +221,7 @@ export default function PantallaPrincipal() {
         </button>
       </header>
 
-      {/* MÓDULO BÚSQUEDA USUARIOS (AHORA PRIMERO) */}
+      {/* MÓDULO BÚSQUEDA USUARIOS */}
       <div className="grid grid-cols-1 gap-4 mb-6">
         
         {/* Remitente (Azul) */}
@@ -370,7 +370,7 @@ export default function PantallaPrincipal() {
 
       </div>
 
-      {/* MÓDULO PAPELETAS (AHORA AL FINAL Y MÁS COMPACTO) */}
+      {/* MÓDULO PAPELETAS AL FINAL */}
       <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
@@ -399,7 +399,7 @@ export default function PantallaPrincipal() {
               )}
             </div>
 
-            {/* ALERTA: ÉXITO AL GUARDAR NUEVA */}
+            {/* ALERTAS PAPELETAS */}
             {estadoPapeleta === 'GUARDADO_EXITO' && (
               <div className="mt-3 p-4 bg-blue-50 border-l-4 border-blue-500 rounded flex items-center justify-between text-blue-800 animate-pulse">
                 <div className="flex items-center gap-3">
@@ -412,7 +412,6 @@ export default function PantallaPrincipal() {
               </div>
             )}
 
-            {/* ALERTA ROJA (USADA HISTÓRICA) */}
             {estadoPapeleta === 'USADA' && (
               <div className="mt-3 p-4 bg-red-50 border-l-4 border-red-500 rounded flex items-center gap-3 text-red-800">
                 <XCircle size={28} />
@@ -425,7 +424,6 @@ export default function PantallaPrincipal() {
               </div>
             )}
 
-            {/* ALERTA VERDE (DISPONIBLE) */}
             {estadoPapeleta === 'DISPONIBLE' && (
               <div className="mt-3 p-4 bg-green-50 border-l-4 border-green-500 rounded flex flex-col sm:flex-row items-start sm:items-center justify-between text-green-800 gap-3">
                 <div className="flex items-center gap-3">
@@ -443,7 +441,6 @@ export default function PantallaPrincipal() {
               </div>
             )}
 
-            {/* ALERTA AMARILLA (NO REGISTRADA) */}
             {estadoPapeleta === 'NO_ENCONTRADA' && (
               <div className="mt-3 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
                 <div className="flex items-center gap-3 text-yellow-800 mb-3">
@@ -495,7 +492,7 @@ export default function PantallaPrincipal() {
         </div>
       </section>
 
-      {/* MODAL NUEVO / EDITAR CLIENTE (Sin cambios funcionales, ajustado el diseño a más compacto) */}
+      {/* MODAL NUEVO / EDITAR CLIENTE (CORREGIDO CON CORREO ELECTRÓNICO) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
@@ -505,27 +502,32 @@ export default function PantallaPrincipal() {
                 <X size={20} />
               </button>
             </div>
+            
             <div className="p-5 grid grid-cols-2 gap-4 text-sm">
               <div className="col-span-2">
                 <label className="block font-bold text-gray-700 mb-1">Nombre / Razón Social *</label>
                 <input type="text" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
                   value={formData.nombre_razon_social} onChange={(e)=>setFormData({...formData, nombre_razon_social: e.target.value})} />
               </div>
+              
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Cédula / RUC</label>
                 <input type="text" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
                   value={formData.cedula_ruc} onChange={(e)=>setFormData({...formData, cedula_ruc: e.target.value})} />
               </div>
+              
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Teléfono</label>
                 <input type="text" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
                   value={formData.telefono} onChange={(e)=>setFormData({...formData, telefono: e.target.value})} />
               </div>
+              
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Isla</label>
                 <input type="text" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
                   value={formData.isla} onChange={(e)=>setFormData({...formData, isla: e.target.value})} />
               </div>
+              
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Tipo de Cliente</label>
                 <select className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50"
@@ -535,12 +537,21 @@ export default function PantallaPrincipal() {
                   <option value="AMBOS">Remitente y Destinatario</option>
                 </select>
               </div>
+
+              {/* CAMPO DE CORREO AGREGADO */}
+              <div className="col-span-2">
+                <label className="block font-bold text-gray-700 mb-1">Correo Electrónico</label>
+                <input type="email" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
+                  value={formData.correo} onChange={(e)=>setFormData({...formData, correo: e.target.value})} />
+              </div>
+
               <div className="col-span-2">
                 <label className="block font-bold text-gray-700 mb-1">Dirección</label>
                 <input type="text" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
                   value={formData.direccion} onChange={(e)=>setFormData({...formData, direccion: e.target.value})} />
               </div>
             </div>
+            
             <div className="bg-gray-100 p-3 border-t flex justify-end gap-3">
               <button onClick={() => { setIsModalOpen(false); setFormData(formInicial); }} className="px-4 py-2 rounded text-gray-600 text-sm font-bold hover:bg-gray-200">
                 Cancelar
@@ -554,4 +565,4 @@ export default function PantallaPrincipal() {
       )}
     </div>
   );
-} 
+}
