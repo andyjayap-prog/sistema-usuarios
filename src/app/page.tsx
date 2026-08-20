@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Search, AlertTriangle, CheckCircle, XCircle, Plus, Edit, Eraser, X, ClipboardCheck, History } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, AlertTriangle, CheckCircle, XCircle, Plus, Edit, Eraser, X, History } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function PantallaPrincipal() {
@@ -11,8 +11,16 @@ export default function PantallaPrincipal() {
   const [fechaPapeletaEncontrada, setFechaPapeletaEncontrada] = useState<string | null>(null);
   const [fechaNuevaPapeleta, setFechaNuevaPapeleta] = useState('');
   
-  // Nuevo estado: Historial de las últimas 5 papeletas
-  const [historialPapeletas, setHistorialPapeletas] = useState<{numero: string, estado: string}[]>([]);
+  // Historial Persistente (Últimas 5)
+  const [historialPapeletas, setHistorialPapeletas] = useState<{numero: string, estado: string, fecha: string}[]>([]);
+
+  // Cargar historial del navegador al abrir la página
+  useEffect(() => {
+    const historialGuardado = localStorage.getItem('historialPapeletas_v1');
+    if (historialGuardado) {
+      setHistorialPapeletas(JSON.parse(historialGuardado));
+    }
+  }, []);
 
   // --- ESTADOS: USUARIOS ---
   const [busquedaRemitente, setBusquedaRemitente] = useState('');
@@ -37,7 +45,7 @@ export default function PantallaPrincipal() {
       <span>
         {partes.map((parte, i) => 
           parte.toLowerCase() === busqueda.toLowerCase() ? (
-            <strong key={i} className="font-black text-blue-900 bg-blue-100 px-1 rounded">
+            <strong key={i} className="font-black text-blue-900 text-[1.15em]">
               {parte}
             </strong>
           ) : (
@@ -48,12 +56,26 @@ export default function PantallaPrincipal() {
     );
   };
 
+  // --- LÓGICA: AUTOCOMPLETADO INTELIGENTE (NUEVO) ---
+  const abrirModalConSugerencia = (termino: string, tipoSugerido: string) => {
+    // Verificar si el término solo tiene números (probablemente una cédula/RUC o teléfono)
+    const esSoloNumeros = /^\d+$/.test(termino.trim());
+    
+    setFormData({
+      ...formInicial,
+      nombre_razon_social: esSoloNumeros ? '' : termino.trim(),
+      cedula_ruc: esSoloNumeros ? termino.trim() : '',
+      tipo: tipoSugerido
+    });
+    setIsModalOpen(true);
+  };
+
   // --- LÓGICA: PAPELETAS ---
-  const agregarAlHistorial = (numero: string, estado: string) => {
+  const agregarAlHistorial = (numero: string, estado: string, fecha: string) => {
     setHistorialPapeletas(prev => {
-      // Agregamos la nueva papeleta al inicio, evitamos duplicados y mantenemos solo 5
-      const nuevo = [{numero, estado}, ...prev.filter(p => p.numero !== numero)].slice(0, 5);
-      return nuevo;
+      const nuevoHistorial = [{numero, estado, fecha}, ...prev.filter(p => p.numero !== numero)].slice(0, 5);
+      localStorage.setItem('historialPapeletas_v1', JSON.stringify(nuevoHistorial));
+      return nuevoHistorial;
     });
   };
 
@@ -85,7 +107,7 @@ export default function PantallaPrincipal() {
     } else if (data) {
       setEstadoPapeleta(data.estado);
       setFechaPapeletaEncontrada(data.fecha_papeleta);
-      agregarAlHistorial(valorEscrito.toUpperCase(), data.estado);
+      agregarAlHistorial(valorEscrito.toUpperCase(), data.estado, data.fecha_papeleta || 'Sin fecha');
     }
   };
 
@@ -103,7 +125,7 @@ export default function PantallaPrincipal() {
 
     if (!error) {
       setEstadoPapeleta('GUARDADO_EXITO');
-      agregarAlHistorial(papeleta.toUpperCase(), 'USADA');
+      agregarAlHistorial(papeleta.toUpperCase(), 'USADA', fechaNuevaPapeleta);
       
       setTimeout(() => {
         limpiarPapeleta();
@@ -119,7 +141,7 @@ export default function PantallaPrincipal() {
 
     if (!error) {
       setEstadoPapeleta('USADA');
-      agregarAlHistorial(papeleta.toUpperCase(), 'USADA');
+      agregarAlHistorial(papeleta.toUpperCase(), 'USADA', fechaPapeletaEncontrada || 'Sin fecha');
     }
   };
 
@@ -199,300 +221,351 @@ export default function PantallaPrincipal() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 font-sans text-sm md:p-6 md:text-base">
+    <div className="min-h-screen bg-gray-50 p-4 font-sans text-sm md:p-6 md:text-base flex flex-col">
       
-      {/* HEADER CENTRADO Y COMPACTO */}
-      <header className="mb-4 border-b pb-4 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-col items-center md:items-start text-center md:text-left w-full md:w-auto flex-1 md:flex-none">
+      <div className="flex-1">
+        {/* HEADER CENTRADO */}
+        <header className="mb-6 border-b pb-4 relative flex flex-col md:flex-row items-center md:justify-center min-h-[40px]">
           <div className="flex items-center gap-2 justify-center">
-            <ClipboardCheck size={32} className="text-blue-800" />
-            <h1 className="text-2xl font-bold text-gray-800 tracking-tight">BÚSQUEDA DE USUARIOS</h1>
+            <Search size={32} className="text-blue-800" />
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">BÚSQUEDA DE USUARIOS</h1>
           </div>
-          <p className="text-sm text-gray-500 font-medium md:ml-10">Módulo de Inspectores</p>
-        </div>
-        <button 
-          onClick={() => {
-            setFormData(formInicial);
-            setIsModalOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm text-sm"
-        >
-          <Plus size={18} /> Nuevo Cliente
-        </button>
-      </header>
+          <button 
+            onClick={() => {
+              setFormData(formInicial);
+              setIsModalOpen(true);
+            }}
+            className="md:absolute md:right-0 mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm text-sm"
+          >
+            <Plus size={18} /> Nuevo Cliente
+          </button>
+        </header>
 
-      {/* MÓDULO BÚSQUEDA USUARIOS */}
-      <div className="grid grid-cols-1 gap-4 mb-6">
-        
-        {/* Remitente (Azul) */}
-        <section className="bg-blue-50 p-4 rounded-xl shadow-sm border-2 border-blue-200">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-bold text-blue-800">Remitente</h2>
-            <button onClick={() => limpiarBusqueda('REMITENTE')} className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-bold px-3 py-1 rounded bg-blue-100 hover:bg-blue-200 transition-colors">
-              <Eraser size={14} /> Limpiar
-            </button>
-          </div>
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-2.5 text-blue-400" size={18} />
-            <input
-              type="text"
-              placeholder="Buscar remitente (Nombre, RUC, Teléfono)..."
-              className="w-full pl-10 pr-10 py-2 border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm shadow-inner"
-              value={busquedaRemitente}
-              onChange={(e) => {
-                setBusquedaRemitente(e.target.value);
-                buscarUsuarios(e.target.value, 'REMITENTE', setRemitentes);
-              }}
-            />
-            {busquedaRemitente && (
-              <button onClick={() => limpiarBusqueda('REMITENTE')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700"><X size={18}/></button>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left bg-white rounded-lg overflow-hidden shadow-sm text-xs md:text-sm">
-              <thead className="bg-blue-600 text-white">
-                <tr>
-                  <th className="px-3 py-2">Nombre / Razón Social</th>
-                  <th className="px-3 py-2">Cédula / RUC</th>
-                  <th className="px-3 py-2">Isla</th>
-                  <th className="px-3 py-2">Dirección</th>
-                  <th className="px-3 py-2">Teléfono</th>
-                  <th className="px-3 py-2">Correo</th>
-                  <th className="px-3 py-2 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {remitentes.length === 0 ? (
-                  <tr className="border-b text-gray-500 text-center">
-                    <td colSpan={7} className="px-3 py-4">{busquedaRemitente.length < 2 ? "Escribe para buscar..." : "Sin resultados"}</td>
-                  </tr>
-                ) : (
-                  remitentes.map((u) => (
-                    <tr 
-                      key={u.id} 
-                      className={`border-b cursor-pointer transition-colors ${usuarioSeleccionadoId === u.id ? 'bg-blue-200 shadow-inner' : 'hover:bg-blue-100'}`}
-                      onClick={() => setUsuarioSeleccionadoId(u.id)}
-                    >
-                      <td className="px-3 py-2 font-medium">{resaltarTexto(u.nombre_razon_social, busquedaRemitente)}</td>
-                      <td className="px-3 py-2">{resaltarTexto(u.cedula_ruc || '-', busquedaRemitente)}</td>
-                      <td className="px-3 py-2">{u.isla || '-'}</td>
-                      <td className="px-3 py-2 truncate max-w-xs">{u.direccion || '-'}</td>
-                      <td className="px-3 py-2">{resaltarTexto(u.telefono || '-', busquedaRemitente)}</td>
-                      <td className="px-3 py-2">{u.correo || '-'}</td>
-                      <td className="px-3 py-2 text-center">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(u); }}
-                          className="p-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded border border-blue-200 shadow-sm" 
-                          title="Editar"
-                        >
-                          <Edit size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Destinatario (Verde) */}
-        <section className="bg-green-50 p-4 rounded-xl shadow-sm border-2 border-green-200">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-bold text-green-800">Destinatario</h2>
-            <button onClick={() => limpiarBusqueda('DESTINATARIO')} className="flex items-center gap-1 text-green-600 hover:text-green-800 text-xs font-bold px-3 py-1 rounded bg-green-100 hover:bg-green-200 transition-colors">
-              <Eraser size={14} /> Limpiar
-            </button>
-          </div>
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-2.5 text-green-400" size={18} />
-            <input
-              type="text"
-              placeholder="Buscar destinatario (Nombre, RUC, Teléfono)..."
-              className="w-full pl-10 pr-10 py-2 border border-green-300 rounded-lg focus:outline-none focus:border-green-500 text-sm shadow-inner"
-              value={busquedaDestinatario}
-              onChange={(e) => {
-                setBusquedaDestinatario(e.target.value);
-                buscarUsuarios(e.target.value, 'DESTINATARIO', setDestinatarios);
-              }}
-            />
-            {busquedaDestinatario && (
-              <button onClick={() => limpiarBusqueda('DESTINATARIO')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700"><X size={18}/></button>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left bg-white rounded-lg overflow-hidden shadow-sm text-xs md:text-sm">
-              <thead className="bg-green-600 text-white">
-                <tr>
-                  <th className="px-3 py-2">Nombre / Razón Social</th>
-                  <th className="px-3 py-2">Cédula / RUC</th>
-                  <th className="px-3 py-2">Isla</th>
-                  <th className="px-3 py-2">Dirección</th>
-                  <th className="px-3 py-2">Teléfono</th>
-                  <th className="px-3 py-2">Correo</th>
-                  <th className="px-3 py-2 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {destinatarios.length === 0 ? (
-                  <tr className="border-b text-gray-500 text-center">
-                    <td colSpan={7} className="px-3 py-4">{busquedaDestinatario.length < 2 ? "Escribe para buscar..." : "Sin resultados"}</td>
-                  </tr>
-                ) : (
-                  destinatarios.map((u) => (
-                    <tr 
-                      key={u.id} 
-                      className={`border-b cursor-pointer transition-colors ${usuarioSeleccionadoId === u.id ? 'bg-green-200 shadow-inner' : 'hover:bg-green-100'}`}
-                      onClick={() => setUsuarioSeleccionadoId(u.id)}
-                    >
-                      <td className="px-3 py-2 font-medium">{resaltarTexto(u.nombre_razon_social, busquedaDestinatario)}</td>
-                      <td className="px-3 py-2">{resaltarTexto(u.cedula_ruc || '-', busquedaDestinatario)}</td>
-                      <td className="px-3 py-2">{u.isla || '-'}</td>
-                      <td className="px-3 py-2 truncate max-w-xs">{u.direccion || '-'}</td>
-                      <td className="px-3 py-2">{resaltarTexto(u.telefono || '-', busquedaDestinatario)}</td>
-                      <td className="px-3 py-2">{u.correo || '-'}</td>
-                      <td className="px-3 py-2 text-center">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(u); }}
-                          className="p-1.5 bg-white text-green-600 hover:bg-green-50 rounded border border-green-200 shadow-sm" 
-                          title="Editar"
-                        >
-                          <Edit size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-      </div>
-
-      {/* MÓDULO PAPELETAS AL FINAL */}
-      <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* MÓDULO BÚSQUEDA USUARIOS */}
+        <div className="grid grid-cols-1 gap-4 mb-6">
           
-          {/* Zona de Escaneo */}
-          <div className="lg:col-span-2">
-            <h2 className="text-lg font-bold mb-3 text-gray-700 flex items-center gap-2">
-              <Search size={20} className="text-gray-400" />
-              Verificación Rápida de Papeletas
-            </h2>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Digitar número de papeleta..."
-                className="w-full pl-4 pr-10 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-gray-600 text-lg uppercase font-bold transition-colors shadow-inner"
-                value={papeleta}
-                onChange={(e) => manejarEscaneoPapeleta(e.target.value)}
-              />
-              {papeleta && (
-                <button 
-                  onClick={limpiarPapeleta} 
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-700 transition-colors"
-                  title="Limpiar"
-                >
-                  <X size={20} />
-                </button>
-              )}
+          {/* Remitente (Azul) */}
+          <section className="bg-blue-50 p-4 rounded-xl shadow-sm border-2 border-blue-200">
+            <h2 className="text-lg font-bold text-blue-800 mb-2">Remitente</h2>
+            
+            {/* BUSCADOR REDUCIDO A LA MITAD DE ANCHO */}
+            <div className="flex items-center gap-2 mb-3 w-full md:w-1/2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 text-blue-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Buscar remitente (Nombre, RUC, Teléfono)..."
+                  className="w-full pl-10 pr-10 py-2 border border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm shadow-inner"
+                  value={busquedaRemitente}
+                  onChange={(e) => {
+                    setBusquedaRemitente(e.target.value);
+                    buscarUsuarios(e.target.value, 'REMITENTE', setRemitentes);
+                  }}
+                />
+                {busquedaRemitente && (
+                  <button onClick={() => limpiarBusqueda('REMITENTE')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700"><X size={18}/></button>
+                )}
+              </div>
+              <button 
+                onClick={() => limpiarBusqueda('REMITENTE')} 
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-bold px-3 py-2 rounded bg-blue-100 hover:bg-blue-200 transition-colors whitespace-nowrap shadow-sm border border-blue-200"
+              >
+                <Eraser size={14} /> Limpiar
+              </button>
             </div>
 
-            {/* ALERTAS PAPELETAS */}
-            {estadoPapeleta === 'GUARDADO_EXITO' && (
-              <div className="mt-3 p-4 bg-blue-50 border-l-4 border-blue-500 rounded flex items-center justify-between text-blue-800 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={28} className="text-blue-600" />
-                  <div>
-                    <h3 className="font-bold text-lg">GUARDADO EXITOSO</h3>
-                    <p className="text-sm font-medium text-blue-900">La papeleta se marcó como USADA.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left bg-white rounded-lg overflow-hidden shadow-sm text-xs md:text-sm">
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    <th className="px-3 py-2">Nombre / Razón Social</th>
+                    <th className="px-3 py-2">Cédula / RUC</th>
+                    <th className="px-3 py-2">Isla</th>
+                    <th className="px-3 py-2">Dirección</th>
+                    <th className="px-3 py-2">Teléfono</th>
+                    <th className="px-3 py-2">Correo</th>
+                    <th className="px-3 py-2 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {remitentes.length === 0 ? (
+                    <tr className="border-b text-gray-500 text-center">
+                      <td colSpan={7} className="px-3 py-8">
+                        {busquedaRemitente.length < 2 ? (
+                          "Escribe para buscar..."
+                        ) : (
+                          // AQUI ESTA LA SUGERENCIA DE NUEVO CLIENTE (REMITENTE)
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <p className="text-gray-600">No se encontró ningún registro para <strong className="text-gray-800 text-base">"{busquedaRemitente}"</strong>.</p>
+                            <button 
+                              onClick={() => abrirModalConSugerencia(busquedaRemitente, 'REMITENTE')}
+                              className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg font-bold transition-colors border border-blue-300 shadow-sm"
+                            >
+                              <Plus size={16} /> Registrar "{busquedaRemitente}" como nuevo cliente
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    remitentes.map((u) => (
+                      <tr 
+                        key={u.id} 
+                        className={`border-b cursor-pointer transition-colors ${usuarioSeleccionadoId === u.id ? 'bg-blue-200 shadow-inner text-blue-900 font-bold' : 'hover:bg-blue-50 text-gray-700'}`}
+                        onClick={() => setUsuarioSeleccionadoId(u.id)}
+                      >
+                        <td className="px-3 py-2">{resaltarTexto(u.nombre_razon_social, busquedaRemitente)}</td>
+                        <td className="px-3 py-2">{resaltarTexto(u.cedula_ruc || '-', busquedaRemitente)}</td>
+                        <td className="px-3 py-2">{u.isla || '-'}</td>
+                        <td className="px-3 py-2 truncate max-w-xs">{u.direccion || '-'}</td>
+                        <td className="px-3 py-2">{resaltarTexto(u.telefono || '-', busquedaRemitente)}</td>
+                        <td className="px-3 py-2">{u.correo || '-'}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); abrirModalEditar(u); }}
+                            className="p-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded border border-blue-200 shadow-sm" 
+                            title="Editar"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Destinatario (Verde) */}
+          <section className="bg-green-50 p-4 rounded-xl shadow-sm border-2 border-green-200">
+            <h2 className="text-lg font-bold text-green-800 mb-2">Destinatario</h2>
+
+            {/* BUSCADOR REDUCIDO A LA MITAD DE ANCHO */}
+            <div className="flex items-center gap-2 mb-3 w-full md:w-1/2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 text-green-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Buscar destinatario (Nombre, RUC, Teléfono)..."
+                  className="w-full pl-10 pr-10 py-2 border border-green-300 rounded-lg focus:outline-none focus:border-green-500 text-sm shadow-inner"
+                  value={busquedaDestinatario}
+                  onChange={(e) => {
+                    setBusquedaDestinatario(e.target.value);
+                    buscarUsuarios(e.target.value, 'DESTINATARIO', setDestinatarios);
+                  }}
+                />
+                {busquedaDestinatario && (
+                  <button onClick={() => limpiarBusqueda('DESTINATARIO')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700"><X size={18}/></button>
+                )}
+              </div>
+              <button 
+                onClick={() => limpiarBusqueda('DESTINATARIO')} 
+                className="flex items-center gap-1 text-green-600 hover:text-green-800 text-xs font-bold px-3 py-2 rounded bg-green-100 hover:bg-green-200 transition-colors whitespace-nowrap shadow-sm border border-green-200"
+              >
+                <Eraser size={14} /> Limpiar
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left bg-white rounded-lg overflow-hidden shadow-sm text-xs md:text-sm">
+                <thead className="bg-green-600 text-white">
+                  <tr>
+                    <th className="px-3 py-2">Nombre / Razón Social</th>
+                    <th className="px-3 py-2">Cédula / RUC</th>
+                    <th className="px-3 py-2">Isla</th>
+                    <th className="px-3 py-2">Dirección</th>
+                    <th className="px-3 py-2">Teléfono</th>
+                    <th className="px-3 py-2">Correo</th>
+                    <th className="px-3 py-2 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {destinatarios.length === 0 ? (
+                    <tr className="border-b text-gray-500 text-center">
+                      <td colSpan={7} className="px-3 py-8">
+                        {busquedaDestinatario.length < 2 ? (
+                          "Escribe para buscar..."
+                        ) : (
+                          // AQUI ESTA LA SUGERENCIA DE NUEVO CLIENTE (DESTINATARIO)
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <p className="text-gray-600">No se encontró ningún registro para <strong className="text-gray-800 text-base">"{busquedaDestinatario}"</strong>.</p>
+                            <button 
+                              onClick={() => abrirModalConSugerencia(busquedaDestinatario, 'DESTINATARIO')}
+                              className="flex items-center gap-2 bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2 rounded-lg font-bold transition-colors border border-green-300 shadow-sm"
+                            >
+                              <Plus size={16} /> Registrar "{busquedaDestinatario}" como nuevo cliente
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    destinatarios.map((u) => (
+                      <tr 
+                        key={u.id} 
+                        className={`border-b cursor-pointer transition-colors ${usuarioSeleccionadoId === u.id ? 'bg-blue-200 shadow-inner text-blue-900 font-bold' : 'hover:bg-green-50 text-gray-700'}`}
+                        onClick={() => setUsuarioSeleccionadoId(u.id)}
+                      >
+                        <td className="px-3 py-2">{resaltarTexto(u.nombre_razon_social, busquedaDestinatario)}</td>
+                        <td className="px-3 py-2">{resaltarTexto(u.cedula_ruc || '-', busquedaDestinatario)}</td>
+                        <td className="px-3 py-2">{u.isla || '-'}</td>
+                        <td className="px-3 py-2 truncate max-w-xs">{u.direccion || '-'}</td>
+                        <td className="px-3 py-2">{resaltarTexto(u.telefono || '-', busquedaDestinatario)}</td>
+                        <td className="px-3 py-2">{u.correo || '-'}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); abrirModalEditar(u); }}
+                            className="p-1.5 bg-white text-green-600 hover:bg-green-50 rounded border border-green-200 shadow-sm" 
+                            title="Editar"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+
+        {/* MÓDULO PAPELETAS AL FINAL */}
+        <section className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Zona de Escaneo */}
+            <div className="lg:col-span-2">
+              <h2 className="text-lg font-bold mb-3 text-gray-700 flex items-center gap-2">
+                <Search size={20} className="text-gray-400" />
+                Verificación Rápida de Papeletas
+              </h2>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Digitar número de papeleta..."
+                  className="w-full pl-4 pr-10 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-gray-600 text-lg uppercase font-bold transition-colors shadow-inner"
+                  value={papeleta}
+                  onChange={(e) => manejarEscaneoPapeleta(e.target.value)}
+                />
+                {papeleta && (
+                  <button 
+                    onClick={limpiarPapeleta} 
+                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-700 transition-colors"
+                    title="Limpiar"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+
+              {/* ALERTAS PAPELETAS */}
+              {estadoPapeleta === 'GUARDADO_EXITO' && (
+                <div className="mt-3 p-4 bg-blue-50 border-l-4 border-blue-500 rounded flex items-center justify-between text-blue-800 animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle size={28} className="text-blue-600" />
+                    <div>
+                      <h3 className="font-bold text-lg">GUARDADO EXITOSO</h3>
+                      <p className="text-sm font-medium text-blue-900">La papeleta se marcó como USADA.</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {estadoPapeleta === 'USADA' && (
-              <div className="mt-3 p-4 bg-red-50 border-l-4 border-red-500 rounded flex items-center gap-3 text-red-800">
-                <XCircle size={28} />
-                <div>
-                  <h3 className="font-bold text-lg">PAPELETA YA UTILIZADA</h3>
-                  {fechaPapeletaEncontrada && (
-                    <p className="text-sm font-medium text-red-900">Fecha del depósito: {fechaPapeletaEncontrada}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {estadoPapeleta === 'DISPONIBLE' && (
-              <div className="mt-3 p-4 bg-green-50 border-l-4 border-green-500 rounded flex flex-col sm:flex-row items-start sm:items-center justify-between text-green-800 gap-3">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={28} />
+              {estadoPapeleta === 'USADA' && (
+                <div className="mt-3 p-4 bg-red-50 border-l-4 border-red-500 rounded flex items-center gap-3 text-red-800">
+                  <XCircle size={28} />
                   <div>
-                    <h3 className="font-bold text-lg">PAPELETA DISPONIBLE</h3>
+                    <h3 className="font-bold text-lg">PAPELETA YA UTILIZADA</h3>
                     {fechaPapeletaEncontrada && (
-                      <p className="text-sm font-medium text-green-900">Fecha del depósito: {fechaPapeletaEncontrada}</p>
+                      <p className="text-sm font-medium text-red-900">Fecha del depósito: {fechaPapeletaEncontrada}</p>
                     )}
                   </div>
                 </div>
-                <button onClick={marcarPapeletaComoUsada} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm w-full sm:w-auto">
-                  Marcar como Usada
-                </button>
-              </div>
-            )}
+              )}
 
-            {estadoPapeleta === 'NO_ENCONTRADA' && (
-              <div className="mt-3 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-                <div className="flex items-center gap-3 text-yellow-800 mb-3">
-                  <AlertTriangle size={24} />
-                  <h3 className="font-bold text-lg">PAPELETA NO REGISTRADA</h3>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 items-end">
-                  <div className="flex-1 w-full">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Fecha del depósito:</label>
-                    <input 
-                      type="date" 
-                      className="w-full p-2 border border-yellow-300 rounded focus:outline-none focus:border-yellow-500 text-sm font-bold bg-white"
-                      value={fechaNuevaPapeleta}
-                      onChange={(e) => setFechaNuevaPapeleta(e.target.value)}
-                    />
+              {estadoPapeleta === 'DISPONIBLE' && (
+                <div className="mt-3 p-4 bg-green-50 border-l-4 border-green-500 rounded flex flex-col sm:flex-row items-start sm:items-center justify-between text-green-800 gap-3">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle size={28} />
+                    <div>
+                      <h3 className="font-bold text-lg">PAPELETA DISPONIBLE</h3>
+                      {fechaPapeletaEncontrada && (
+                        <p className="text-sm font-medium text-green-900">Fecha del depósito: {fechaPapeletaEncontrada}</p>
+                      )}
+                    </div>
                   </div>
-                  <button onClick={registrarNuevaPapeleta} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded font-bold shadow-sm w-full sm:w-auto text-sm transition-colors">
-                    Guardar y Utilizar
+                  <button onClick={marcarPapeletaComoUsada} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm w-full sm:w-auto">
+                    Marcar como Usada
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Historial Reciente */}
-          <div className="lg:col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col h-full">
-            <h3 className="font-bold text-gray-700 mb-3 border-b border-gray-200 pb-2 flex items-center gap-2 text-sm">
-              <History size={16} className="text-gray-500" />
-              Historial Reciente (Últimas 5)
-            </h3>
-            <ul className="flex-1 flex flex-col gap-2">
-              {historialPapeletas.length === 0 ? (
-                <li className="text-sm text-gray-400 italic text-center py-4">Aún no hay papeletas consultadas...</li>
-              ) : (
-                historialPapeletas.map((h, i) => (
-                  <li key={i} className="flex justify-between items-center bg-white p-2 rounded border border-gray-100 shadow-sm">
-                    <span className="font-mono font-bold text-gray-700 text-sm">{h.numero}</span>
-                    <span className={`text-[10px] uppercase px-2 py-1 rounded font-black ${
-                      h.estado === 'USADA' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {h.estado}
-                    </span>
-                  </li>
-                ))
               )}
-            </ul>
-          </div>
-          
-        </div>
-      </section>
 
-      {/* MODAL NUEVO / EDITAR CLIENTE (CORREGIDO CON CORREO ELECTRÓNICO) */}
+              {estadoPapeleta === 'NO_ENCONTRADA' && (
+                <div className="mt-3 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                  <div className="flex items-center gap-3 text-yellow-800 mb-3">
+                    <AlertTriangle size={24} />
+                    <h3 className="font-bold text-lg">PAPELETA NO REGISTRADA</h3>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 items-end">
+                    <div className="flex-1 w-full">
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Fecha del depósito:</label>
+                      <input 
+                        type="date" 
+                        className="w-full p-2 border border-yellow-300 rounded focus:outline-none focus:border-yellow-500 text-sm font-bold bg-white"
+                        value={fechaNuevaPapeleta}
+                        onChange={(e) => setFechaNuevaPapeleta(e.target.value)}
+                      />
+                    </div>
+                    <button onClick={registrarNuevaPapeleta} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded font-bold shadow-sm w-full sm:w-auto text-sm transition-colors">
+                      Guardar y Utilizar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Historial Reciente Persistente */}
+            <div className="lg:col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col h-full">
+              <h3 className="font-bold text-gray-700 mb-3 border-b border-gray-200 pb-2 flex items-center gap-2 text-sm">
+                <History size={16} className="text-gray-500" />
+                Historial Reciente (Últimas 5)
+              </h3>
+              <ul className="flex-1 flex flex-col gap-2">
+                {historialPapeletas.length === 0 ? (
+                  <li className="text-sm text-gray-400 italic text-center py-4">Aún no hay papeletas consultadas...</li>
+                ) : (
+                  historialPapeletas.map((h, i) => (
+                    <li key={i} className="flex justify-between items-center bg-white p-2 rounded border border-gray-100 shadow-sm">
+                      <div className="flex flex-col">
+                        <span className="font-mono font-bold text-gray-700 text-sm">{h.numero}</span>
+                        <span className="text-[10px] text-gray-400 font-medium">{h.fecha}</span>
+                      </div>
+                      <span className={`text-[10px] uppercase px-2 py-1 rounded font-black ${
+                        h.estado === 'USADA' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                      }`}>
+                        {h.estado}
+                      </span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            
+          </div>
+        </section>
+      </div>
+
+      {/* FOOTER - AUTORÍA DISCRETA */}
+      <footer className="mt-8 text-center pb-2">
+        <p className="text-[11px] text-gray-400 font-medium">
+          © 2026 Todos los derechos reservados. Copyright por el Lic. Andy Jaya.
+        </p>
+      </footer>
+
+      {/* MODAL NUEVO / EDITAR CLIENTE */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
@@ -538,7 +611,6 @@ export default function PantallaPrincipal() {
                 </select>
               </div>
 
-              {/* CAMPO DE CORREO AGREGADO */}
               <div className="col-span-2">
                 <label className="block font-bold text-gray-700 mb-1">Correo Electrónico</label>
                 <input type="email" className="w-full p-2 border rounded focus:border-blue-500 outline-none bg-gray-50" 
